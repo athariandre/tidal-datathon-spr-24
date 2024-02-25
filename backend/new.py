@@ -192,7 +192,7 @@ class Path:
 
             for i,row in hourly_dataframe.iterrows():
                 temp = row["wind_speed_10m"]
-                if temp >= 10.0:
+                if temp >= 30.0:
                     hourly_dataframe.at[i,"wind_speed_10m"] = 1.0
                 else:
                     hourly_dataframe.at[i,"wind_speed_10m"] = 0.0
