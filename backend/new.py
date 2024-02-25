@@ -1,15 +1,13 @@
 import json
 import requests
 import polyline
-import lightgbm as lgb
 import joblib
 import openmeteo_requests
 import pandas as pd
 import requests_cache
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from retry_requests import retry
-from backend.weather_processing import *
 
 
 key = "AIzaSyAblqkZYB0S1noTtq-GWTImAFk0PYcvGvs"
@@ -24,10 +22,9 @@ class Point:
 
 class Path:
 
-
     origin = Point(0,0)
     destination = Point(0,0)
-    weather = pd.dataFrame(columns=["date", "clear", "soil", "fog", "rain", "wind", "sleet", "snow"])
+    weather = pd.DataFrame(columns=["date", "clear", "soil", "fog", "rain", "wind", "sleet", "snow"])
     score = 0
 
 
@@ -36,7 +33,7 @@ class Path:
         self.destination = destination
         self.time = datetime.strptime(time, "%m-%d-%Y %H")
     
-    def getIndexedCoordinates(start_point, end_point):
+    def getIndexedCoordinates(self, start_point, end_point):
 
         fields = "routes.polyline.encodedPolyline,routes.duration"
         routeurl = f"https://routes.googleapis.com/directions/v2:computeRoutes?key={key}&fields={fields}"
@@ -70,6 +67,7 @@ class Path:
         response = requests.post(routeurl, route_json_string)
         response_json = response.json()
 
+
         encoded_polyline = response_json['routes'][0]['polyline']['encodedPolyline']
         decoded_polyline = polyline.decode(encoded_polyline)
         decoded_polyline = decoded_polyline[::2]
@@ -84,7 +82,7 @@ class Path:
 
         return point_list
     
-    def pointWeatherData(point_list):
+    def pointWeatherData(self, point_list):
 
         cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)
         retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
@@ -101,8 +99,8 @@ class Path:
         lonstr = ""
         
         for datapoint in point_list:
-            lat = datapoint[0]
-            lon = datapoint[1]
+            lat = datapoint.latitude
+            lon = datapoint.longitude
             latstr+=str(lat)+","
             lonstr+=str(lon)+","
 
@@ -228,42 +226,27 @@ class Path:
 
             column_order = ['date', 'clear','soil', 'fog', 'rain', 'wind', 'sleet','snow']
             hourly_dataframe = hourly_dataframe[column_order]
-            weather = weather.append(hourly_dataframe, ignore_index=True)
-        return weather
+            self.weather = pd.concat([self.weather, hourly_dataframe], axis=0)
+        return self.weather
     
-    def pointScoreData(point_list):
-        for item in point_list:
-            dateless_item = item.drop['date']
-            item['score'] = loaded_model.predict(dateless_item)
-        return point_list
-    
-    
-
-    
-
-
-
-    
-
+    def pointScoreData(self, weather_list):
+        for index, item in weather_list.iterrows():
+            dateless_item = item.drop('date', axis=0)
+            weather_list.at[index, 'score'] = loaded_model.predict(dateless_item.values.reshape(1, -1))[0]
+        return weather_list
     
     
 
+debug = Path(Point(29.7604,-95.3698), Point(30.6280,-96.314445), "02-25-2024 10")
+
+
+# indexCoords = debug.getIndexedCoordinates(debug.origin, debug.destination)
+
+# weatherData = debug.pointWeatherData(indexCoords)
+
+# scoredata = debug.pointScoreData(weatherData)
 
 
 
-
-
-
-
-
-
-
-
-def safestTime(origin, destination, starttime, endtime): #start and end time in format: "MM-DD-YYYY HH" (hr in 24-hr time)
-    formatstring = "%m-%d-%Y %H"
-    starttime_object = datetime.strptime(starttime, formatstring)
-    endtime_object = datetime.strptime(endtime, formatstring)
-    
-    path_list = generatePaths(origin, destination, starttime_object, endtime_object)
 
     
