@@ -230,23 +230,41 @@ class Path:
         return self.weather
     
     def pointScoreData(self, weather_list):
+        weather_list['score'] = 700  # Initialize score column with base value
         for index, item in weather_list.iterrows():
-            dateless_item = item.drop('date', axis=0)
-            weather_list.at[index, 'score'] = loaded_model.predict(dateless_item.values.reshape(1, -1))[0]
+            score = item['score']  # Retrieve the current score value
+            if int(item['clear']) == 1:
+                score *= 0.75
+            if int(item['soil']) == 1:
+                score *= 2
+            if int(item['fog']) == 1:
+                score *= 1.23294812
+            if int(item['rain']) == 1:
+                score *= 3
+            if int(item['wind']) == 1:
+                score *= 1
+            if int(item['sleet']) == 1:
+                score *= 4
+            if int(item['snow']) == 1:
+                score *= 5
+            # Update the 'score' column with the calculated value
+            weather_list.at[index, 'score'] = score
+
         return weather_list
+
     
     
 
 debug = Path(Point(29.7604,-95.3698), Point(30.6280,-96.314445), "02-25-2024 10")
 
 
-# indexCoords = debug.getIndexedCoordinates(debug.origin, debug.destination)
+indexCoords = debug.getIndexedCoordinates(debug.origin, debug.destination)
 
-# weatherData = debug.pointWeatherData(indexCoords)
+weatherData = debug.pointWeatherData(indexCoords)
 
-# scoredata = debug.pointScoreData(weatherData)
+scoredata = debug.pointScoreData(weatherData)
 
 
-
+scoredata.to_csv('scoredata_temp.csv')
 
     
